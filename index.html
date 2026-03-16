@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="expenseTracker">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExpenseTracker | Premium Financial Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- AngularJS -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body ng-controller="MainController">
+    <!-- Auth Overlay -->
+    <div class="auth-overlay" ng-if="!isLoggedIn">
+        <div class="card auth-card">
+            <h2 ng-if="authMode === 'login'">Welcome Back</h2>
+            <h2 ng-if="authMode === 'register'">Create Account</h2>
+            <p ng-if="authMode === 'login'">Please enter your details to sign in</p>
+            <p ng-if="authMode === 'register'">Join us to manage your expenses effectively</p>
+
+            <form ng-submit="handleAuth()">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" ng-model="authData.username" placeholder="Enter username" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" ng-model="authData.password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    {{ authMode === 'login' ? 'Sign In' : 'Sign Up' }}
+                </button>
+            </form>
+
+            <div class="auth-toggle">
+                <span ng-if="authMode === 'login'">
+                    Don't have an account? <a href="#" ng-click="toggleAuthMode()">Register</a>
+                </span>
+                <span ng-if="authMode === 'register'">
+                    Already have an account? <a href="#" ng-click="toggleAuthMode()">Login</a>
+                </span>
+            </div>
+            
+            <div ng-if="authError" style="color: var(--expense); text-align: center; margin-top: 1rem; font-size: 0.875rem;">
+                {{ authError }}
+            </div>
+        </div>
+    </div>
+
+    <div class="container" ng-if="isLoggedIn">
+        <div class="header-actions">
+            <div class="user-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                {{ currentUser.username }}
+            </div>
+            <button class="logout-btn" ng-click="logout()">Logout</button>
+        </div>
+        <header>
+            <h1>Expense Tracker</h1>
+            <p style="color: var(--text-secondary)">Manage your finances with elegance</p>
+        </header>
+
+        <!-- Dashboard Summary -->
+        <div class="dashboard-summary">
+            <div class="card summary-card">
+                <h3>Total Balance</h3>
+                <div class="value balance" id="totalBalance">₹ {{ balance | number:2 }}</div>
+            </div>
+            <div class="card summary-card">
+                <h3>Total Income</h3>
+                <div class="value income">₹ {{ totalIncome | number:2 }}</div>
+            </div>
+            <div class="card summary-card">
+                <h3>Total Expenses</h3>
+                <div class="value expense">₹ {{ totalExpense | number:2 }}</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Column: Add Transaction Form -->
+            <section class="card">
+                <h2 style="margin-bottom: 1.5rem">Add Transaction</h2>
+                <form ng-submit="addTransaction()">
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" ng-model="newTransaction.title" placeholder="e.g., Grocery Shopping" required>
+                    </div>
+                    <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem">
+                        <div>
+                            <label>Amount</label>
+                            <input type="number" ng-model="newTransaction.amount" placeholder="0.00" required>
+                        </div>
+                        <div>
+                            <label>Type</label>
+                            <select ng-model="newTransaction.type" required>
+                                <option value="Income">Income</option>
+                                <option value="Expense">Expense</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem">
+                        <div>
+                            <label>Category</label>
+                            <select ng-model="newTransaction.category" required>
+                                <option value="Food">Food & Dining</option>
+                                <option value="Transport">Transport</option>
+                                <option value="Rent">Rent</option>
+                                <option value="Utilities">Utilities</option>
+                                <option value="Entertainment">Entertainment</option>
+                                <option value="Salary">Salary</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Date</label>
+                            <input type="date" ng-model="newTransaction.date" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="addBtn">Add Transaction</button>
+                </form>
+            </section>
+
+            <!-- Right Column: Transactions List & Filter -->
+            <section class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem">
+                    <h2>Transactions</h2>
+                    <input type="text" ng-model="searchQuery" placeholder="Search transactions..." style="width: 250px; padding: 0.6rem">
+                </div>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Title</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr ng-repeat="item in filteredTransactions = (transactions | filter:searchQuery) | orderBy:'-date' track by item.id">
+                                <td style="color: var(--text-secondary)">{{ item.date | date:'dd MMM yyyy' }}</td>
+                                <td style="font-weight: 600">{{ item.title }}</td>
+                                <td>
+                                    <span class="type-badge" ng-class="{'badge-income': item.type === 'Income', 'badge-expense': item.type === 'Expense'}">
+                                        {{ item.category }}
+                                    </span>
+                                </td>
+                                <td ng-class="{'income': item.type === 'Income', 'expense': item.type === 'Expense'}" style="font-weight: 700">
+                                    {{ item.type === 'Income' ? '+' : '-' }} ₹ {{ item.amount | number:2 }}
+                                </td>
+                                <td>
+                                    <button class="delete-btn" ng-click="deleteTransaction(item.id)" title="Delete">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div ng-if="filteredTransactions.length === 0" style="text-align: center; padding: 2rem; color: var(--text-secondary)">
+                        No matching transactions found.
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-grid">
+            <div class="card chart-card">
+                <h3 style="margin-bottom: 1.5rem">Category Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="margin-bottom: 1.5rem">Cash Flow (Income vs Expense)</h3>
+                <div class="chart-container">
+                    <canvas id="cashFlowChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Expense Tracker. All rights reserved by Gangera Divyam</p>
+    </footer>
+
+    <!-- App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
